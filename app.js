@@ -1017,6 +1017,21 @@ function setupEventListeners() {
       helpModal.classList.add('hidden');
     }
   });
+
+  // 9. Mobile responsive sidebar controls
+  const mobileToggle = document.getElementById('mobile-sidebar-toggle');
+  const mobileClose = document.getElementById('mobile-sidebar-close');
+  const sidebar = document.querySelector('.sidebar');
+
+  if (mobileToggle && mobileClose && sidebar) {
+    mobileToggle.addEventListener('click', () => {
+      sidebar.classList.add('active');
+    });
+
+    mobileClose.addEventListener('click', () => {
+      sidebar.classList.remove('active');
+    });
+  }
 }
 
 /**

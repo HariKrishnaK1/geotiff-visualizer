@@ -48,7 +48,12 @@
           <h2>Visualization Platform</h2>
         </div>
       </div>
-      <div class="badge">ISRO / NRSC-DSS</div>
+      <div class="header-right" style="display: flex; align-items: center; gap: 8px;">
+        <div class="badge">ISRO / NRSC-DSS</div>
+        <button class="sidebar-close-btn" id="mobile-sidebar-close" title="Close Panel">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
     </header>
 
     <div class="sidebar-content">
@@ -232,6 +237,11 @@
   <!-- Main Map Container -->
   <main class="map-container">
     <div id="map"></div>
+
+    <!-- Floating mobile settings toggle button -->
+    <button class="mobile-toggle-btn" id="mobile-sidebar-toggle" title="Open Settings Dashboard">
+      <i class="fa-solid fa-gears"></i> Dashboard
+    </button>
 
     <!-- Floating Map Header Dashboard Info -->
     <div class="map-overlay-header">
