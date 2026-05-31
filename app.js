@@ -964,7 +964,7 @@ function handleSelectedFile(file) {
     const arrayBuffer = e.target.result;
 
     // Use georaster parser to convert binary TIFF headers and grids
-    parse_georaster(arrayBuffer).then(georaster => {
+    parseGeoraster(arrayBuffer).then(georaster => {
       georasterObject = georaster;
 
       // Handle spatial metadata defaults if incomplete in headers
