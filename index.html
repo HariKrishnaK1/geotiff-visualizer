@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NRSC GeoTIFF Visualization Platform - Professional GIS Satellite Remote Sensing Dashboard">
+  <title>NRSC GeoTIFF Visualization Platform</title>
+  
+  <!-- Google Fonts for UI (Plus Jakarta Sans) and scientific numbers/titles (Space Grotesk, Fira Code) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome for GIS and remote sensing UI icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  
+  <!-- Chart.js for beautiful scientific data rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  
+  <!-- georaster (parses GeoTIFF binary in browser) -->
+  <script src="https://cdn.jsdelivr.net/npm/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
+  
+  <!-- georaster-layer-for-leaflet (renders parsed GeoTIFF directly on Leaflet map) -->
+  <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <!-- Sidebar Panel (Left) -->
+  <aside class="sidebar">
+    <!-- Header -->
+    <header class="sidebar-header">
+      <div class="brand">
+        <i class="fa-solid fa-earth-asia brand-icon"></i>
+        <div>
+          <h1>NRSC GeoTIFF</h1>
+          <h2>Visualization Platform</h2>
+        </div>
+      </div>
+      <div class="badge">ISRO / NRSC-DSS</div>
+    </header>
+
+    <div class="sidebar-content">
+      <!-- Section 1: Upload & Demo Control -->
+      <section class="card" id="control-section">
+        <div class="card-title">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <h3>Satellite Data Input</h3>
+        </div>
+        
+        <!-- Drag & Drop File Zone -->
+        <div class="upload-zone" id="drop-zone">
+          <input type="file" id="file-input" accept=".tif,.tiff" class="file-input">
+          <i class="fa-solid fa-file-invoice-raster upload-icon"></i>
+          <p class="upload-text">Drag & drop GeoTIFF or <span>browse</span></p>
+          <p class="upload-subtext">Supports .tif / .tiff spatial imagery</p>
+        </div>
+
+        <div class="file-info-bar hidden" id="file-info-bar">
+          <i class="fa-regular fa-file-code"></i>
+          <span id="selected-file-name" class="file-name">No file selected</span>
+          <button id="clear-file-btn" class="clear-btn" title="Remove file"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- Buttons -->
+        <div class="button-group">
+          <button id="analyze-btn" class="btn btn-primary" disabled>
+            <i class="fa-solid fa-square-poll-vertical"></i> Analyze Dataset
+          </button>
+          <button id="demo-btn" class="btn btn-secondary">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Load Demo Scene
+          </button>
+        </div>
+      </section>
+
+      <!-- Section 2: Visualization Modes -->
+      <section class="card hidden" id="visuals-section">
+        <div class="card-title">
+          <i class="fa-solid fa-sliders"></i>
+          <h3>Overlay Controls</h3>
+        </div>
+        
+        <!-- Opacity Slider -->
+        <div class="control-row">
+          <label for="opacity-slider">Layer Opacity (<span id="opacity-val">80%</span>)</label>
+          <input type="range" id="opacity-slider" min="0" max="100" value="80" class="slider">
+        </div>
+
+        <!-- Render Mode Dropdown -->
+        <div class="control-row">
+          <label for="render-mode">Visualization Mode</label>
+          <select id="render-mode" class="select-input">
+            <option value="ndvi">NDVI (Normalized Vegetation Index)</option>
+            <option value="false-color">False Color Infrared (NIR, R, G)</option>
+            <option value="true-color">True Color (RGB)</option>
+            <option value="grayscale">Single Band Grayscale</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Section 3: Metadata Details -->
+      <section class="card hidden" id="metadata-section">
+        <div class="card-title">
+          <i class="fa-solid fa-circle-info"></i>
+          <h3>Image Metadata</h3>
+        </div>
+        
+        <table class="meta-table">
+          <tbody>
+            <tr>
+              <td>File Name</td>
+              <td id="meta-filename">-</td>
+            </tr>
+            <tr>
+              <td>Projection</td>
+              <td id="meta-crs">-</td>
+            </tr>
+            <tr>
+              <td>Dimensions</td>
+              <td id="meta-dim">-</td>
+            </tr>
+            <tr>
+              <td>Spectral Bands</td>
+              <td id="meta-bands">-</td>
+            </tr>
+            <tr>
+              <td>Resolution</td>
+              <td id="meta-res">-</td>
+            </tr>
+            <tr>
+              <td>Area Bounds</td>
+              <td id="meta-bounds" class="code-font">-</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- Section 4: NDVI Formula Card -->
+      <section class="card" id="formula-section">
+        <div class="card-title">
+          <i class="fa-solid fa-microscope"></i>
+          <h3>NDVI Science</h3>
+        </div>
+        <div class="formula-box">
+          <div class="formula">NDVI = <span class="frac"><span>NIR - RED</span><span class="symbol">/</span><span>NIR + RED</span></span></div>
+        </div>
+        <div class="formula-desc">
+          <p><span class="highlight">NIR</span> represents Near-Infrared reflectance (high in healthy leaves).</p>
+          <p><span class="highlight">RED</span> represents Red light absorption (absorbed by chlorophyll).</p>
+          <p class="summary-tip"><i class="fa-regular fa-lightbulb"></i> Values closer to <strong>+1.0</strong> represent dense, healthy vegetation, while negative values represent water, clouds, or barren lands.</p>
+        </div>
+      </section>
+
+      <!-- Section 5: Click inspector -->
+      <section class="card hidden" id="inspector-section">
+        <div class="card-title">
+          <i class="fa-solid fa-location-crosshairs"></i>
+          <h3>Pixel Inspector (Selected Point)</h3>
+        </div>
+        <div class="inspector-grid">
+          <div class="inspector-item">
+            <span class="label">Coordinate</span>
+            <span class="value" id="inspect-coords">-</span>
+          </div>
+          <div class="inspector-item">
+            <span class="label">NDVI Value</span>
+            <span class="value accent-green" id="inspect-ndvi">-</span>
+          </div>
+          <div class="inspector-item">
+            <span class="label">Reflectance Bands</span>
+            <span class="value" id="inspect-bands">-</span>
+          </div>
+          <div class="inspector-item">
+            <span class="label">Land Cover Class</span>
+            <span class="value highlight-pill" id="inspect-class">-</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 6: Analytics & Charts -->
+      <section class="card" id="charts-section">
+        <div class="card-title">
+          <i class="fa-solid fa-chart-line"></i>
+          <h3>Temporal Vegetation Trends</h3>
+        </div>
+        
+        <div class="chart-container">
+          <canvas id="ndviTrendChart"></canvas>
+        </div>
+        
+        <div class="chart-container hidden" id="distribution-chart-container">
+          <div class="chart-header">
+            <h4>Scene Land Cover Distribution</h4>
+          </div>
+          <canvas id="landCoverChart"></canvas>
+        </div>
+      </section>
+    </div>
+    
+    <!-- Footer -->
+    <footer class="sidebar-footer">
+      <p>&copy; 2026 NRSC Satellite Processing Unit</p>
+      <div class="footer-links">
+        <span>V1.4-Beta</span>
+        <span>&bull;</span>
+        <a href="#" id="help-trigger">System Documentation</a>
+      </div>
+    </footer>
+  </aside>
+
+  <!-- Main Map Container -->
+  <main class="map-container">
+    <div id="map"></div>
+
+    <!-- Floating Map Header Dashboard Info -->
+    <div class="map-overlay-header">
+      <div class="overlay-pill">
+        <span class="dot pulse green"></span>
+        <span id="system-status">Satellite Stream: Standby</span>
+      </div>
+      <div class="overlay-pill coordinate-tracker" id="mouse-coords">
+        <i class="fa-solid fa-location-dot"></i> Lat: --.----, Lng: --.----
+      </div>
+    </div>
+
+    <!-- Floating Map Controls (Top Right) -->
+    <div class="map-floating-controls">
+      <div class="control-box layer-selector">
+        <button class="map-ctrl-btn active" id="basemap-sat" title="Satellite Imagery">
+          <i class="fa-solid fa-satellite"></i> Satellite
+        </button>
+        <button class="map-ctrl-btn" id="basemap-osm" title="Street Map">
+          <i class="fa-solid fa-map"></i> Street Map
+        </button>
+        <button class="map-ctrl-btn" id="basemap-dark" title="Scientific Dark Mode">
+          <i class="fa-solid fa-moon"></i> Dark Base
+        </button>
+      </div>
+    </div>
+
+    <!-- Floating Legend Panel (Bottom Right) -->
+    <div class="legend-panel card">
+      <div class="legend-header">
+        <i class="fa-solid fa-palette"></i>
+        <h4>NDVI Classification</h4>
+      </div>
+      <div class="legend-scale">
+        <div class="scale-item"><span class="color-box" style="background: #1b5e20;"></span><span>0.6 to 1.0 (Dense Canopy Forest)</span></div>
+        <div class="scale-item"><span class="color-box" style="background: #4caf50;"></span><span>0.4 to 0.6 (Healthy Agriculture)</span></div>
+        <div class="scale-item"><span class="color-box" style="background: #8bc34a;"></span><span>0.2 to 0.4 (Shrub & Grassland)</span></div>
+        <div class="scale-item"><span class="color-box" style="background: #d4e7a2;"></span><span>0.1 to 0.2 (Sparse Scrub/Barren)</span></div>
+        <div class="scale-item"><span class="color-box" style="background: #e2cfa7;"></span><span>0.0 to 0.1 (Urban / Built-up)</span></div>
+        <div class="scale-item"><span class="color-box" style="background: #0055ff;"></span><span>-1.0 to 0.0 (Water / Clouds)</span></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Help & Documentation Modal -->
+  <div class="modal-backdrop hidden" id="help-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-earth-asia"></i> NRSC GeoTIFF Viewer - Technical Guide</h3>
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <h4>1. Platform Purpose</h4>
+        <p>This decision-support system is an interactive prototype designed to demonstrate client-side web rendering of geographic raster datasets (GeoTIFF) and perform real-time vegetative analytics (NDVI).</p>
+        
+        <h4>2. How to Operate</h4>
+        <ul>
+          <li><strong>Upload a GeoTIFF:</strong> Drag and drop any <code>.tif</code> or <code>.tiff</code> file that is georeferenced (e.g. WGS84 EPSG:4326 or UTM coordinate systems) into the upload zone.</li>
+          <li><strong>Alternative Demo:</strong> Click the "Load Demo Scene" button to instantly render a synthetic multi-spectral (NIR, Red, Green) crop-plain scene centered in Hyderabad, India.</li>
+          <li><strong>Run Analysis:</strong> Click the green "Analyze Dataset" button to zoom directly to the raster bounds, project the layer, and enable the live Pixel Inspector.</li>
+          <li><strong>Interact with Map:</strong> Click anywhere on the rendered overlay area. The pixel inspector will calculate the exact coordinate position, the active spectral band values, and determine the vegetative index.</li>
+          <li><strong>Compare Visualization Modes:</strong> Toggle between the color composites (NDVI Heatmap, False-Color Infrared, True-Color, or Grayscale) in the Overlay Controls to examine features.</li>
+        </ul>
+
+        <h4>3. Under the Hood</h4>
+        <p>The client side runs <code>georaster.js</code> to decode metadata, geotagged matrices, and image tags of raw binary TIFF arrays directly in the browser's main thread. It then uses <code>georaster-layer-for-leaflet.js</code> to write dynamic color calculations onto an HTML Canvas overlaid on top of a web mapping layout powered by Leaflet.</p>
+
+        <div class="system-specs">
+          <p><strong>System Specs:</strong> Offline Capability &bull; Leaflet v1.9.4 &bull; Georaster v1.6.0 &bull; WebGL Canvas Accelerator Enabled</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast -->
+  <div class="toast hidden" id="toast">
+    <i id="toast-icon" class="fa-solid fa-circle-info"></i>
+    <span id="toast-msg">System alert</span>
+  </div>
+
+  <!-- Custom JavaScript -->
+  <script src="app.js"></script>
+</body>
+</html>
