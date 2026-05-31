@@ -1080,7 +1080,8 @@ h1, h2, h3, h4, h5, h6 {
   .sidebar {
     position: fixed;
     top: 0;
-    left: -100%;
+    left: 0;
+    transform: translateX(-100%);
     width: 85%;
     max-width: 380px;
     height: 100vh;
@@ -1090,7 +1091,13 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .sidebar.active {
-    transform: translateX(100%);
+    transform: translateX(0);
+  }
+
+  .sidebar-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch; /* Butter-smooth native momentum scroll on iOS */
   }
 
   .sidebar-close-btn {
@@ -1112,35 +1119,30 @@ h1, h2, h3, h4, h5, h6 {
     background-color: rgba(255, 23, 68, 0.1);
   }
 
-  /* Mobile floating dashboard trigger */
+  /* Mobile floating dashboard trigger inside map-overlay-header */
   .mobile-toggle-btn {
     display: flex !important;
     align-items: center;
     gap: 8px;
-    position: absolute;
-    bottom: 30px;
-    left: 20px;
-    z-index: 1001;
-    background-color: var(--bg-sidebar);
+    background-color: rgba(15, 19, 26, 0.95);
     border: 1px solid var(--accent-neon);
     color: var(--accent-neon);
     font-family: var(--font-ui);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
-    padding: 12px 20px;
+    padding: 8px 16px;
     border-radius: 30px;
-    box-shadow: 0 0 15px rgba(0, 230, 118, 0.35);
+    box-shadow: 0 0 10px rgba(0, 230, 118, 0.25);
     cursor: pointer;
     backdrop-filter: var(--glass-blur);
     transition: var(--transition-smooth);
     pointer-events: auto;
   }
 
-  .mobile-toggle-btn:hover {
+  .mobile-toggle-btn:hover, .mobile-toggle-btn:active {
     background-color: var(--accent-neon);
     color: #05080c;
-    box-shadow: 0 0 25px var(--accent-neon);
-    transform: translateY(-2px);
+    box-shadow: 0 0 20px var(--accent-neon);
   }
 
   .map-container {
@@ -1158,6 +1160,9 @@ h1, h2, h3, h4, h5, h6 {
     top: 15px;
     left: 15px;
     max-width: calc(100% - 30px);
+    display: flex;
+    align-items: center;
+    pointer-events: none;
   }
 
   /* Adjust floats layer controller */
@@ -1168,7 +1173,7 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Adjust legends for small screens */
   .legend-panel {
-    bottom: 95px;
+    bottom: 30px;
     right: 15px;
     width: 220px;
     padding: 10px;
