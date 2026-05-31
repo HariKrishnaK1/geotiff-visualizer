@@ -1165,10 +1165,29 @@ h1, h2, h3, h4, h5, h6 {
     pointer-events: none;
   }
 
-  /* Adjust floats layer controller */
+  /* Adjust floats layer controller (Vertical stack of circular buttons on mobile) */
   .map-floating-controls {
-    top: 15px;
-    right: 15px;
+    top: 12px;
+    right: 12px;
+  }
+
+  .layer-selector {
+    flex-direction: column !important;
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+
+  .map-ctrl-btn {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    font-size: 14px !important;
+  }
+
+  .map-ctrl-btn span {
+    display: none !important; /* Hide labels to save space */
   }
 
   /* Adjust legends for small screens */
