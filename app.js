@@ -16,6 +16,32 @@ let currentOpacity = 0.8;
 let currentMode = 'ndvi';
 let activeBasemapName = 'sat';
 
+// Spectral Band Indices Mapping (Dynamic based on profile selection)
+let currentBandProfile = 'demo';
+let redBandIndex = 0;
+let nirBandIndex = 1;
+let greenBandIndex = 2;
+let blueBandIndex = null;
+
+function updateBandIndices() {
+  if (currentBandProfile === 'demo') {
+    redBandIndex = 0;
+    nirBandIndex = 1;
+    greenBandIndex = 2;
+    blueBandIndex = null;
+  } else if (currentBandProfile === 'bgr') {
+    blueBandIndex = 0;
+    greenBandIndex = 1;
+    redBandIndex = 2;
+    nirBandIndex = null; // No NIR
+  } else if (currentBandProfile === 'rgb') {
+    redBandIndex = 0;
+    greenBandIndex = 1;
+    blueBandIndex = 2;
+    nirBandIndex = null; // No NIR
+  }
+}
+
 // Charts
 let ndviTrendChart = null;
 let landCoverChart = null;
@@ -212,21 +238,23 @@ function renderRasterOverlay() {
       return null;
     }
 
-    // Capture bands
-    const band0 = values[0];
-    const band1 = values[1] !== undefined ? values[1] : null;
-    const band2 = values[2] !== undefined ? values[2] : null;
+    // Dynamic band values extraction
+    const redVal = redBandIndex !== null && values[redBandIndex] !== undefined ? values[redBandIndex] : null;
+    const greenVal = greenBandIndex !== null && values[greenBandIndex] !== undefined ? values[greenBandIndex] : null;
+    const blueVal = blueBandIndex !== null && values[blueBandIndex] !== undefined ? values[blueBandIndex] : null;
+    const nirVal = nirBandIndex !== null && values[nirBandIndex] !== undefined ? values[nirBandIndex] : null;
 
     if (currentMode === 'ndvi') {
-      // Vegetation index calculation: NDVI = (NIR - RED) / (NIR + RED)
-      // In our multi-band data, band 1 is NIR and band 0 is RED.
       let ndvi = 0;
-      if (band1 !== null) {
-        // Multi-band dataset (e.g. Synthetic dataset: NIR = Band 1, Red = Band 0)
-        ndvi = (band1 - band0) / (band1 + band0 + 0.00001);
+      if (nirVal !== null && redVal !== null) {
+        // True NDVI (NIR and Red)
+        ndvi = (nirVal - redVal) / (nirVal + redVal + 0.00001);
+      } else if (greenVal !== null && redVal !== null) {
+        // Fallback GRVI: (Green - Red) / (Green + Red)
+        ndvi = (greenVal - redVal) / (greenVal + redVal + 0.00001);
       } else {
         // Single band dataset: Assume value itself represents raw index or elevation
-        // Normalize value to -1.0 to 1.0 range if it is currently outside (e.g. 0 to 255)
+        const band0 = values[0];
         if (georasterObject.mins[0] >= 0 && georasterObject.maxs[0] > 1) {
           const range = georasterObject.ranges[0] || 255;
           ndvi = -1.0 + (2.0 * (band0 - georasterObject.mins[0]) / range);
@@ -235,59 +263,75 @@ function renderRasterOverlay() {
         }
       }
 
-      // Map scientific NDVI thresholds to rich color palette
+      // Map scientific NDVI/GRVI thresholds to rich color palette
       if (ndvi < -0.1) return '#0055ff'; // Deep Water body
-      if (ndvi < 0.1) return '#e2cfa7';  // Urban/Built-up / Bare soil
-      if (ndvi < 0.2) return '#d4e7a2';  // Dry sparse scrub / Barren land
-      if (ndvi < 0.4) return '#8bc34a';  // Shrub & Grasslands
-      if (ndvi < 0.6) return '#4caf50';  // Healthy Agriculture / Crops
+      if (ndvi < 0.08) return '#e2cfa7'; // Urban/Built-up / Bare soil
+      if (ndvi < 0.15) return '#d4e7a2'; // Dry sparse scrub / Barren land
+      if (ndvi < 0.3) return '#8bc34a';  // Shrub & Grasslands
+      if (ndvi < 0.5) return '#4caf50';  // Healthy Agriculture / Crops
       return '#1b5e20';                  // Dense Forest / Canopy
     }
     
     else if (currentMode === 'false-color') {
-      // False-Color Infrared Composite (NIR -> Red, RED -> Green, GREEN -> Blue)
-      // Standard satellite composite for mapping vegetation in bright red
-      if (band1 !== null && band2 !== null) {
-        // Multi-band scene: Band 1 is NIR, Band 0 is RED, Band 2 is GREEN
-        // Scale values to standard 0-255 RGB spectrum
-        const scaleVal = (val, min, max) => {
-          const range = max - min || 255;
-          return Math.min(255, Math.max(0, Math.floor(((val - min) / range) * 255)));
-        };
+      const scaleVal = (val, bandIdx) => {
+        if (val === null) return 0;
+        const min = georasterObject.mins[bandIdx];
+        const max = georasterObject.maxs[bandIdx];
+        const range = max - min || 255;
+        return Math.min(255, Math.max(0, Math.floor(((val - min) / range) * 255)));
+      };
 
-        const r = scaleVal(band1, georasterObject.mins[1], georasterObject.maxs[1]); // NIR (very bright for plants)
-        const g = scaleVal(band0, georasterObject.mins[0], georasterObject.maxs[0]); // RED
-        const b = scaleVal(band2, georasterObject.mins[2], georasterObject.maxs[2]); // GREEN
+      if (nirVal !== null && redVal !== null && greenVal !== null) {
+        // NIR -> Red, Red -> Green, Green -> Blue
+        const r = scaleVal(nirVal, nirBandIndex);
+        const g = scaleVal(redVal, redBandIndex);
+        const b = scaleVal(greenVal, greenBandIndex);
         return `rgb(${r},${g},${b})`;
+      } else if (redVal !== null && greenVal !== null && blueVal !== null) {
+        // Pseudo Shift False-Color (swap RGB order)
+        const r = scaleVal(redVal, redBandIndex);
+        const g = scaleVal(greenVal, greenBandIndex);
+        const b = scaleVal(blueVal, blueBandIndex);
+        return `rgb(${b},${r},${g})`;
       } else {
-        // Fallback if single-band
+        const band0 = values[0];
         const gray = Math.min(255, Math.max(0, Math.floor(band0)));
         return `rgb(${gray},0,0)`;
       }
     }
     
     else if (currentMode === 'true-color') {
-      // Natural True Color (RGB Composite)
-      if (band2 !== null) {
-        // Synthetic mapping: Band 0 (Red), Band 2 (Green) and a simulated Blue channel
-        const scaleVal = (val, min, max) => {
-          const range = max - min || 255;
-          return Math.min(255, Math.max(0, Math.floor(((val - min) / range) * 255)));
-        };
-        const r = scaleVal(band0, georasterObject.mins[0], georasterObject.maxs[0]);
-        const g = scaleVal(band2, georasterObject.mins[2], georasterObject.maxs[2]);
-        // Simulate blue reflectance (lower than red and green in vegetation)
-        const b = Math.floor(r * 0.7 + g * 0.3);
+      const scaleVal = (val, bandIdx) => {
+        if (val === null) return 0;
+        const min = georasterObject.mins[bandIdx];
+        const max = georasterObject.maxs[bandIdx];
+        const range = max - min || 255;
+        return Math.min(255, Math.max(0, Math.floor(((val - min) / range) * 255)));
+      };
+
+      if (redVal !== null && greenVal !== null && blueVal !== null) {
+        const r = scaleVal(redVal, redBandIndex);
+        const g = scaleVal(greenVal, greenBandIndex);
+        const b = scaleVal(blueVal, blueBandIndex);
+        return `rgb(${r},${g},${b})`;
+      } else if (redVal !== null && greenVal !== null && nirVal !== null) {
+        // Demo synthetic preset mapping
+        const r = scaleVal(redVal, redBandIndex);
+        const g = scaleVal(greenVal, greenBandIndex);
+        const b = Math.floor(r * 0.7 + g * 0.3); // Simulate blue
         return `rgb(${r},${g},${b})`;
       } else {
-        // Fallback: Gray map
-        const gray = Math.min(255, Math.max(0, Math.floor(band0)));
+        const band0 = values[0];
+        const min = georasterObject.mins[0];
+        const max = georasterObject.maxs[0];
+        const range = max - min || 255;
+        const gray = Math.min(255, Math.max(0, Math.floor(((band0 - min) / range) * 255)));
         return `rgb(${gray},${gray},${gray})`;
       }
     }
     
     else if (currentMode === 'grayscale') {
-      // Direct Single-Band Grayscale
+      const band0 = values[0];
       const min = georasterObject.mins[0];
       const max = georasterObject.maxs[0];
       const range = max - min || 255;
@@ -359,11 +403,21 @@ function analyzeRasterData() {
   const height = georasterObject.height;
   const bands = georasterObject.numberOfRasters;
 
+  // Formulate dynamic band details label
+  let bandsLabel = `${bands} Band${bands > 1 ? 's' : ''}`;
+  if (currentBandProfile === 'demo') {
+    bandsLabel += " (Red, NIR, Green)";
+  } else if (currentBandProfile === 'bgr') {
+    bandsLabel += " (Blue, Green, Red)";
+  } else if (currentBandProfile === 'rgb') {
+    bandsLabel += " (Red, Green, Blue)";
+  }
+
   // 1. Populate metadata values in sidebar
   document.getElementById('meta-filename').textContent = selectedFile ? selectedFile.name : "synthetic_demo_scene.tif";
   document.getElementById('meta-crs').textContent = georasterObject.projection ? `EPSG:${georasterObject.projection}` : "EPSG:4326 (WGS 84)";
   document.getElementById('meta-dim').textContent = `${width} \u00d7 ${height} px`;
-  document.getElementById('meta-bands').textContent = `${bands} Band${bands > 1 ? 's' : ''} (Red, NIR, Green)`;
+  document.getElementById('meta-bands').textContent = bandsLabel;
   
   // Formulate resolution string
   const resX = georasterObject.pixelWidth.toFixed(6);
@@ -377,7 +431,7 @@ function analyzeRasterData() {
   const yMax = georasterObject.ymax.toFixed(4);
   document.getElementById('meta-bounds').innerHTML = `W: ${xMin}&deg;<br>E: ${xMax}&deg;<br>S: ${yMin}&deg;<br>N: ${yMax}&deg;`;
 
-  // 2. Perform pixel sweep to categorize land cover distributions
+  // 2. Perform pixel sweep to categorize land cover distributions using dynamic band indices
   let totalPixels = 0;
   let waterCount = 0;
   let urbanCount = 0;
@@ -386,8 +440,9 @@ function analyzeRasterData() {
   let agricultureCount = 0;
   let denseCount = 0;
 
-  const redBand = georasterObject.values[0];
-  const nirBand = georasterObject.values[1];
+  const redBand = redBandIndex !== null ? georasterObject.values[redBandIndex] : georasterObject.values[0];
+  const nirBand = nirBandIndex !== null ? georasterObject.values[nirBandIndex] : null;
+  const greenBand = greenBandIndex !== null ? georasterObject.values[greenBandIndex] : null;
 
   // Sweep every 2nd pixel for swift performance without losing accuracy
   const step = width > 500 ? 4 : 2; 
@@ -397,13 +452,19 @@ function analyzeRasterData() {
     for (let c = 0; c < width; c += step) {
       const redVal = redBand[r][c];
       const nirVal = nirBand && nirBand[r] ? nirBand[r][c] : null;
+      const greenVal = greenBand && greenBand[r] ? greenBand[r][c] : null;
 
       if (redVal === null || redVal === undefined) continue;
 
       let ndvi = 0;
       if (nirVal !== null) {
+        // True NDVI (NIR and Red)
         ndvi = (nirVal - redVal) / (nirVal + redVal + 0.00001);
+      } else if (greenVal !== null) {
+        // Fallback GRVI: (Green - Red) / (Green + Red)
+        ndvi = (greenVal - redVal) / (greenVal + redVal + 0.00001);
       } else {
+        // Single-band
         if (georasterObject.mins[0] >= 0 && georasterObject.maxs[0] > 1) {
           const range = georasterObject.ranges[0] || 255;
           ndvi = -1.0 + (2.0 * (redVal - georasterObject.mins[0]) / range);
@@ -415,10 +476,10 @@ function analyzeRasterData() {
       totalPixels++;
 
       if (ndvi < -0.1) waterCount++;
-      else if (ndvi < 0.1) urbanCount++;
-      else if (ndvi < 0.2) scrubCount++;
-      else if (ndvi < 0.4) grasslandCount++;
-      else if (ndvi < 0.6) agricultureCount++;
+      else if (ndvi < 0.08) urbanCount++;
+      else if (ndvi < 0.15) scrubCount++;
+      else if (ndvi < 0.3) grasslandCount++;
+      else if (ndvi < 0.5) agricultureCount++;
       else denseCount++;
     }
   }
@@ -496,23 +557,29 @@ function handleMapClick(e) {
     // Ensure within array bounds
     if (col < 0 || col >= width || row < 0 || row >= height) return;
 
-    // 2. Fetch raw pixel band values
-    const redVal = georasterObject.values[0][row] !== undefined ? georasterObject.values[0][row][col] : null;
-    const nirVal = georasterObject.values[1] && georasterObject.values[1][row] !== undefined ? georasterObject.values[1][row][col] : null;
-    const greenVal = georasterObject.values[2] && georasterObject.values[2][row] !== undefined ? georasterObject.values[2][row][col] : null;
+    // 2. Fetch raw pixel band values using dynamic indices
+    const redVal = redBandIndex !== null && georasterObject.values[redBandIndex][row] !== undefined ? georasterObject.values[redBandIndex][row][col] : null;
+    const greenVal = greenBandIndex !== null && georasterObject.values[greenBandIndex] && georasterObject.values[greenBandIndex][row] !== undefined ? georasterObject.values[greenBandIndex][row][col] : null;
+    const blueVal = blueBandIndex !== null && georasterObject.values[blueBandIndex] && georasterObject.values[blueBandIndex][row] !== undefined ? georasterObject.values[blueBandIndex][row][col] : null;
+    const nirVal = nirBandIndex !== null && georasterObject.values[nirBandIndex] && georasterObject.values[nirBandIndex][row] !== undefined ? georasterObject.values[nirBandIndex][row][col] : null;
 
     if (redVal === null || redVal === undefined) {
-      showToast("Clicked on Nodatal value region", "info");
+      showToast("Clicked on Nodata value region", "info");
       return;
     }
 
-    // 3. Compute vegetation index (NDVI)
+    // 3. Compute vegetation index (NDVI / GRVI)
     let ndvi = 0;
-    let bandDetailsStr = `R: ${redVal}`;
+    let indexName = "NDVI";
+    let bandDetailsStr = `B1: ${redVal}`;
 
     if (nirVal !== null) {
       ndvi = (nirVal - redVal) / (nirVal + redVal + 0.00001);
       bandDetailsStr = `Red: ${Math.round(redVal)} | NIR: ${Math.round(nirVal)}` + (greenVal !== null ? ` | Grn: ${Math.round(greenVal)}` : '');
+    } else if (greenVal !== null) {
+      ndvi = (greenVal - redVal) / (greenVal + redVal + 0.00001); // Fallback GRVI
+      indexName = "GRVI";
+      bandDetailsStr = `Red: ${Math.round(redVal)} | Green: ${Math.round(greenVal)}` + (blueVal !== null ? ` | Blue: ${Math.round(blueVal)}` : '');
     } else {
       // Normalize single band
       if (georasterObject.mins[0] >= 0 && georasterObject.maxs[0] > 1) {
@@ -524,7 +591,7 @@ function handleMapClick(e) {
       bandDetailsStr = `Band 1: ${redVal.toFixed(2)}`;
     }
 
-    // 4. Classify land cover category based on NDVI value
+    // 4. Classify land cover category based on NDVI/GRVI value
     let landCoverClass = "Unknown";
     let landClassColor = "#ffffff";
     let landCoverDescription = "";
@@ -532,20 +599,20 @@ function handleMapClick(e) {
     if (ndvi < -0.1) {
       landCoverClass = "Water Body / Wetland";
       landClassColor = "#2979ff";
-      landCoverDescription = "High NIR absorption. Characterized by rivers, lakes, or dense cloud shadows.";
-    } else if (ndvi < 0.1) {
+      landCoverDescription = "High absorption. Characterized by rivers, lakes, or dense cloud shadows.";
+    } else if (ndvi < 0.08) {
       landCoverClass = "Urban / Built-up / Bare";
       landClassColor = "#e2cfa7";
-      landCoverDescription = "High reflectance in both Red and NIR. Typified by concrete structures or fallow bare fields.";
-    } else if (ndvi < 0.2) {
+      landCoverDescription = "High reflectance in both Red and Green/NIR. Typified by concrete structures or fallow bare fields.";
+    } else if (ndvi < 0.15) {
       landCoverClass = "Sparse Scrub / Desert";
       landClassColor = "#d4e7a2";
       landCoverDescription = "Semi-arid soil surface with sparse, dry scrub patches.";
-    } else if (ndvi < 0.4) {
+    } else if (ndvi < 0.3) {
       landCoverClass = "Shrub & Grassland";
       landClassColor = "#8bc34a";
       landCoverDescription = "Moderate vegetation coverage, natural grasslands, or early-stage crops.";
-    } else if (ndvi < 0.6) {
+    } else if (ndvi < 0.5) {
       landCoverClass = "Healthy Crops / Agriculture";
       landClassColor = "#4caf50";
       landCoverDescription = "Active agricultural sector. High photosynthetic chlorophyll reflectance.";
@@ -558,7 +625,7 @@ function handleMapClick(e) {
     // 5. Update Pixel Inspector card in Left Sidebar
     document.getElementById('inspector-section').classList.remove('hidden');
     document.getElementById('inspect-coords').innerHTML = `Lat: ${lat.toFixed(5)}&deg;<br>Lng: ${lng.toFixed(5)}&deg;<br><small class="code-font">(Row: ${row}, Col: ${col})</small>`;
-    document.getElementById('inspect-ndvi').textContent = ndvi.toFixed(4);
+    document.getElementById('inspect-ndvi').innerHTML = `${ndvi.toFixed(4)} <small style="font-size:9px; color:#90a4ae;">(${indexName})</small>`;
     document.getElementById('inspect-bands').textContent = bandDetailsStr;
     
     const inspectClassSpan = document.getElementById('inspect-class');
@@ -836,6 +903,10 @@ function setupEventListeners() {
     document.getElementById('metadata-section').classList.add('hidden');
     document.getElementById('inspector-section').classList.add('hidden');
     document.getElementById('distribution-chart-container').classList.add('hidden');
+    document.getElementById('spectral-profile-row').classList.add('hidden');
+
+    currentBandProfile = 'demo';
+    updateBandIndices();
 
     if (activeRasterLayer) map.removeLayer(activeRasterLayer);
     if (activeBoundaryLayer) map.removeLayer(activeBoundaryLayer);
@@ -873,6 +944,10 @@ function setupEventListeners() {
 
   // 4. Load demo data
   demoBtn.addEventListener('click', () => {
+    // Reset band profile when loading demo
+    document.getElementById('spectral-profile-row').classList.add('hidden');
+    currentBandProfile = 'demo';
+    updateBandIndices();
     generateDemoDataset();
   });
 
@@ -891,6 +966,18 @@ function setupEventListeners() {
     if (georasterObject) {
       showToast(`Rendering layer mode: ${renderMode.options[renderMode.selectedIndex].text}`, "info");
       renderRasterOverlay();
+    }
+  });
+
+  // 6b. Change spectral band profile
+  const spectralProfile = document.getElementById('spectral-profile');
+  spectralProfile.addEventListener('change', (e) => {
+    currentBandProfile = e.target.value;
+    updateBandIndices();
+    if (georasterObject) {
+      showToast(`Band profile updated: ${spectralProfile.options[spectralProfile.selectedIndex].text}`, "info");
+      renderRasterOverlay();
+      analyzeRasterData();
     }
   });
 
@@ -997,10 +1084,25 @@ function handleSelectedFile(file) {
         }
       }
 
+      if (georasterObject.numberOfRasters >= 3) {
+        document.getElementById('spectral-profile-row').classList.remove('hidden');
+        if (file.name.toLowerCase().includes('sample') || georasterObject.projection === 32631) {
+          document.getElementById('spectral-profile').value = 'bgr';
+          currentBandProfile = 'bgr';
+        } else {
+          document.getElementById('spectral-profile').value = 'rgb';
+          currentBandProfile = 'rgb';
+        }
+      } else {
+        document.getElementById('spectral-profile-row').classList.add('hidden');
+        currentBandProfile = 'rgb'; // default fallback
+      }
+      updateBandIndices();
+
       document.getElementById('selected-file-name').innerHTML = `<i class="fa-solid fa-file-image"></i> ${file.name}`;
       document.getElementById('analyze-btn').removeAttribute('disabled');
       document.getElementById('system-status').textContent = "Satellite Stream: Dataset Ready";
-      showToast("GeoTIFF parsed successfully! Clicks Analyze to map it.", "success");
+      showToast("GeoTIFF parsed successfully! Click Analyze to map it.", "success");
     }).catch(err => {
       console.error(err);
       showToast("Parser Error: Failed to parse GeoTIFF spatial matrix.", "error");

@@ -26,6 +26,9 @@
   <!-- georaster (parses GeoTIFF binary in browser) -->
   <script src="https://cdn.jsdelivr.net/npm/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
   
+  <!-- proj4-fully-loaded (enables automatic reprojection of UTM and local coordinate systems) -->
+  <script src="https://cdn.jsdelivr.net/npm/proj4-fully-loaded@0.2.0/dist/proj4-fully-loaded.min.js"></script>
+  
   <!-- georaster-layer-for-leaflet (renders parsed GeoTIFF directly on Leaflet map) -->
   <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
 
@@ -98,10 +101,20 @@
         <div class="control-row">
           <label for="render-mode">Visualization Mode</label>
           <select id="render-mode" class="select-input">
-            <option value="ndvi">NDVI (Normalized Vegetation Index)</option>
+            <option value="ndvi">Vegetative Index (NDVI/GRVI)</option>
             <option value="false-color">False Color Infrared (NIR, R, G)</option>
             <option value="true-color">True Color (RGB)</option>
             <option value="grayscale">Single Band Grayscale</option>
+          </select>
+        </div>
+
+        <!-- Dynamic Band Profile Selector -->
+        <div class="control-row hidden" id="spectral-profile-row">
+          <label for="spectral-profile"><i class="fa-solid fa-layer-group"></i> Band Profile</label>
+          <select id="spectral-profile" class="select-input">
+            <option value="demo">Demo Preset (B1: Red | B2: NIR | B3: Green)</option>
+            <option value="bgr">Standard BGR (B1: Blue | B2: Green | B3: Red)</option>
+            <option value="rgb">Standard RGB (B1: Red | B2: Green | B3: Blue)</option>
           </select>
         </div>
       </section>

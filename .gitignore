@@ -24,3 +24,15 @@ logs/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Dependency directories
+node_modules/
+jspm_packages/
+web_modules/
+
+# Local build/test assets
+package.json
+package-lock.json
+*.tif
+*.tiff
+
