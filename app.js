@@ -1050,64 +1050,81 @@ function handleSelectedFile(file) {
   reader.onload = (e) => {
     const arrayBuffer = e.target.result;
 
-    // Use georaster parser to convert binary TIFF headers and grids
-    parseGeoraster(arrayBuffer).then(georaster => {
-      georasterObject = georaster;
+    showToast("Parsing GeoTIFF binary structure...", "info");
 
-      // Handle spatial metadata defaults if incomplete in headers
-      if (!georasterObject.projection) {
-        georasterObject.projection = 4326; // Fallback default
+    try {
+      // Resolve the georaster parser function from all standard browser bundle global namespaces
+      const parser = window.parseGeoraster || 
+                     window.GeoRaster || 
+                     window.georaster || 
+                     (typeof parseGeoraster !== 'undefined' ? parseGeoraster : null);
+
+      if (!parser || typeof parser !== 'function') {
+        throw new Error("GeoRaster parser library is not fully initialized or loaded.");
       }
-      
-      // Calculate missing mins/maxs ranges if not parsed
-      if (!georasterObject.mins || georasterObject.mins[0] === undefined) {
-        georasterObject.mins = [];
-        georasterObject.maxs = [];
-        georasterObject.ranges = [];
 
-        for (let b = 0; b < georasterObject.numberOfRasters; b++) {
-          let min = Infinity;
-          let max = -Infinity;
-          const band = georasterObject.values[b];
-          for (let r = 0; r < georasterObject.height; r++) {
-            if (!band[r]) continue;
-            for (let c = 0; c < georasterObject.width; c++) {
-              const val = band[r][c];
-              if (val === null || val === undefined || isNaN(val)) continue;
-              if (val < min) min = val;
-              if (val > max) max = val;
+      parser(arrayBuffer).then(georaster => {
+        georasterObject = georaster;
+
+        // Handle spatial metadata defaults if incomplete in headers
+        if (!georasterObject.projection) {
+          georasterObject.projection = 4326; // Fallback default
+        }
+        
+        // Calculate missing mins/maxs ranges if not parsed
+        if (!georasterObject.mins || georasterObject.mins[0] === undefined) {
+          georasterObject.mins = [];
+          georasterObject.maxs = [];
+          georasterObject.ranges = [];
+
+          for (let b = 0; b < georasterObject.numberOfRasters; b++) {
+            let min = Infinity;
+            let max = -Infinity;
+            const band = georasterObject.values[b];
+            for (let r = 0; r < georasterObject.height; r++) {
+              if (!band[r]) continue;
+              for (let c = 0; c < georasterObject.width; c++) {
+                const val = band[r][c];
+                if (val === null || val === undefined || isNaN(val)) continue;
+                if (val < min) min = val;
+                if (val > max) max = val;
+              }
             }
+            georasterObject.mins.push(min);
+            georasterObject.maxs.push(max);
+            georasterObject.ranges.push(max - min);
           }
-          georasterObject.mins.push(min);
-          georasterObject.maxs.push(max);
-          georasterObject.ranges.push(max - min);
         }
-      }
 
-      if (georasterObject.numberOfRasters >= 3) {
-        document.getElementById('spectral-profile-row').classList.remove('hidden');
-        if (file.name.toLowerCase().includes('sample') || georasterObject.projection === 32631) {
-          document.getElementById('spectral-profile').value = 'bgr';
-          currentBandProfile = 'bgr';
+        if (georasterObject.numberOfRasters >= 3) {
+          document.getElementById('spectral-profile-row').classList.remove('hidden');
+          if (file.name.toLowerCase().includes('sample') || georasterObject.projection === 32631) {
+            document.getElementById('spectral-profile').value = 'bgr';
+            currentBandProfile = 'bgr';
+          } else {
+            document.getElementById('spectral-profile').value = 'rgb';
+            currentBandProfile = 'rgb';
+          }
         } else {
-          document.getElementById('spectral-profile').value = 'rgb';
-          currentBandProfile = 'rgb';
+          document.getElementById('spectral-profile-row').classList.add('hidden');
+          currentBandProfile = 'rgb'; // default fallback
         }
-      } else {
-        document.getElementById('spectral-profile-row').classList.add('hidden');
-        currentBandProfile = 'rgb'; // default fallback
-      }
-      updateBandIndices();
+        updateBandIndices();
 
-      document.getElementById('selected-file-name').innerHTML = `<i class="fa-solid fa-file-image"></i> ${file.name}`;
-      document.getElementById('analyze-btn').removeAttribute('disabled');
-      document.getElementById('system-status').textContent = "Satellite Stream: Dataset Ready";
-      showToast("GeoTIFF parsed successfully! Click Analyze to map it.", "success");
-    }).catch(err => {
-      console.error(err);
-      showToast("Parser Error: Failed to parse GeoTIFF spatial matrix.", "error");
+        document.getElementById('selected-file-name').innerHTML = `<i class="fa-solid fa-file-image"></i> ${file.name}`;
+        document.getElementById('analyze-btn').removeAttribute('disabled');
+        document.getElementById('system-status').textContent = "Satellite Stream: Dataset Ready";
+        showToast("GeoTIFF parsed successfully! Click Analyze to map it.", "success");
+      }).catch(err => {
+        console.error("GeoRaster Promise parsing error:", err);
+        showToast(`Parser Error: ${err.message || 'Failed to decode GeoTIFF.'}`, "error");
+        document.getElementById('file-info-bar').classList.add('hidden');
+      });
+    } catch (err) {
+      console.error("Synchronous parsing setup error:", err);
+      showToast(`Parsing Setup Error: ${err.message}`, "error");
       document.getElementById('file-info-bar').classList.add('hidden');
-    });
+    }
   };
 
   reader.readAsArrayBuffer(file);
