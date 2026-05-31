@@ -640,11 +640,11 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--bg-space);
 }
 
-/* Floating Header Bar */
+/* Floating Header Bar (Shifted right to avoid overlapping Leaflet zoom controls) */
 .map-overlay-header {
   position: absolute;
-  top: 20px;
-  left: 20px;
+  top: 12px;
+  left: 60px;
   z-index: 999;
   display: flex;
   gap: 10px;
@@ -1155,11 +1155,11 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
   }
 
-  /* Adjust maps floating header */
+  /* Adjust maps floating header (shifted right on mobile to avoid zoom overlap) */
   .map-overlay-header {
-    top: 15px;
-    left: 15px;
-    max-width: calc(100% - 30px);
+    top: 12px;
+    left: 55px;
+    max-width: calc(100% - 70px);
     display: flex;
     align-items: center;
     pointer-events: none;
