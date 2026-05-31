@@ -1150,8 +1150,9 @@ h1, h2, h3, h4, h5, h6 {
     height: 100vh;
   }
 
-  /* Remove coordinate tracking on touch screens */
-  .coordinate-tracker {
+  /* Remove coordinate tracking and map overlay pills on touch screens */
+  .coordinate-tracker,
+  .map-overlay-header .overlay-pill {
     display: none !important;
   }
 

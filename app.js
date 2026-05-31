@@ -835,7 +835,7 @@ function generateDemoDataset() {
   document.getElementById('file-info-bar').classList.remove('hidden');
   document.getElementById('selected-file-name').innerHTML = `<i class="fa-solid fa-robot"></i> Synthetic_Demo_Hyderabad.tif`;
   document.getElementById('analyze-btn').removeAttribute('disabled');
-  document.getElementById('system-status').textContent = "Satellite Stream: Demo Preloaded";
+  updateSystemStatus("Satellite Stream: Demo Preloaded");
 
   showToast("Demo Scene generated. Ready for analysis.", "success");
 }
@@ -896,7 +896,7 @@ function setupEventListeners() {
     
     document.getElementById('file-info-bar').classList.add('hidden');
     analyzeBtn.setAttribute('disabled', 'true');
-    document.getElementById('system-status').textContent = "Satellite Stream: Standby";
+    updateSystemStatus("Satellite Stream: Standby");
     
     // Hide panels
     document.getElementById('visuals-section').classList.add('hidden');
@@ -924,7 +924,7 @@ function setupEventListeners() {
     
     // Set Status active
     const statusText = selectedFile ? selectedFile.name : "Hyderabad_Synthetic_Grid";
-    document.getElementById('system-status').innerHTML = `Satellite Stream: ACTIVE - ${statusText}`;
+    updateSystemStatus(null, `Satellite Stream: ACTIVE - ${statusText}`);
     
     // Enable controls sections
     document.getElementById('visuals-section').classList.remove('hidden');
@@ -1128,7 +1128,7 @@ function handleSelectedFile(file) {
 
         document.getElementById('selected-file-name').innerHTML = `<i class="fa-solid fa-file-image"></i> ${file.name}`;
         document.getElementById('analyze-btn').removeAttribute('disabled');
-        document.getElementById('system-status').textContent = "Satellite Stream: Dataset Ready";
+        updateSystemStatus("Satellite Stream: Dataset Ready");
         showToast("GeoTIFF parsed successfully! Click Analyze to map it.", "success");
       }).catch(err => {
         console.error("GeoRaster Promise parsing error:", err);
@@ -1187,4 +1187,27 @@ function showToast(msg, type = 'info') {
       toast.classList.add('hidden');
     }, 300);
   }, 4000);
+}
+
+/**
+ * Safely updates the system status text in both the map HUD overlay
+ * and the sidebar drawer panel header for full responsive sync.
+ */
+function updateSystemStatus(text, html = null) {
+  const el = document.getElementById('system-status');
+  const sidebarEl = document.getElementById('sidebar-system-status');
+  
+  if (el) {
+    if (html) el.innerHTML = html;
+    else el.textContent = text;
+  }
+  
+  if (sidebarEl) {
+    if (html) {
+      // For sidebar, keep it clean and short
+      sidebarEl.innerHTML = html.replace("Satellite Stream:", "Stream:");
+    } else {
+      sidebarEl.textContent = text.replace("Satellite Stream:", "Stream:");
+    }
+  }
 }
